@@ -8,6 +8,7 @@
     
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;700;800&display=swap');
@@ -20,14 +21,26 @@
         .theme-lava { background-image: linear-gradient(-45deg, #590d22, #a4133c, #ff4d6d, #ffb703); }
         .theme-ocean { background-image: linear-gradient(-45deg, #000428, #004e92, #00c6ff, #0072ff); }
         .theme-sunset { background-image: linear-gradient(-45deg, #ee7752, #e73c7e, #23a6d5, #23d5ab); }
+        
         .glass { background: rgba(255, 255, 255, 0.15); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.4); box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3); }
+        
         #chat-box::-webkit-scrollbar { width: 4px; }
         #chat-box::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.5); border-radius: 10px; }
+        
         .photo-floater { position: absolute; bottom: -300px; pointer-events: none; z-index: 50; animation: floatUpPhoto linear forwards; background-color: white; padding: 8px 8px 25px 8px; box-shadow: 0 10px 20px rgba(0,0,0,0.25); border-radius: 4px; transform-origin: center; }
         .photo-floater img { width: 100%; height: 100%; object-fit: cover; border-radius: 2px; display: block; }
         @keyframes floatUpPhoto { 0% { transform: translateY(0) rotate(var(--rot-start)) scale(0.8); opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { transform: translateY(-120vh) rotate(var(--rot-end)) scale(1); opacity: 0; } }
+        
         .heart-img { position: absolute; z-index: -5; pointer-events: none; animation: floatHeart linear forwards; opacity: 0.8; filter: drop-shadow(0 0 10px rgba(255,255,255,0.4)); }
         @keyframes floatHeart { 0% { transform: translateY(110vh) scale(0.5); opacity: 0; } 20% { opacity: 0.7; } 80% { opacity: 0.7; } 100% { transform: translateY(-10vh) scale(1.2); opacity: 0; } }
+
+        /* Tombol Action Chat (Reply/React) */
+        .msg-actions { opacity: 0; transition: opacity 0.2s; }
+        .chat-row:hover .msg-actions { opacity: 1; }
+        
+        /* Reaction Picker */
+        .reaction-picker { animation: popIn 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        @keyframes popIn { from { transform: scale(0); opacity: 0; } to { transform: scale(1); opacity: 1; } }
     </style>
 </head>
 <body class="h-screen flex items-center justify-center relative overflow-hidden">
@@ -47,15 +60,39 @@
             <p class="text-white/80 text-xs font-bold tracking-[0.4em] mt-4 uppercase">My Favorite Person</p>
         </div>
         
-        <div class="flex-1 flex flex-col min-h-0 bg-black/20 rounded-2xl p-4 border border-white/10 shadow-inner">
-            <div id="chat-box" class="flex-1 overflow-y-auto mb-3 pr-2 space-y-3">
+        <div class="flex-1 flex flex-col min-h-0 bg-black/20 rounded-2xl p-4 border border-white/10 shadow-inner relative">
+            <div id="chat-box" class="flex-1 overflow-y-auto mb-3 pr-2 space-y-4">
                 <div class="text-center text-white/50 text-xs py-10 italic">Menghubungkan ke hati... ⏳</div>
             </div>
-            <div class="flex gap-2 relative mt-2">
+
+            <div id="reply-banner" class="hidden flex items-center justify-between bg-white/10 backdrop-blur-md p-2 rounded-lg mb-2 border-l-4 border-purple-400">
+                <div class="text-left text-xs text-white">
+                    <span class="font-bold text-purple-300 block mb-1">Membalas <span id="reply-to-name">...</span></span>
+                    <span id="reply-text" class="italic opacity-70 line-clamp-1">...</span>
+                </div>
+                <button onclick="cancelReply()" class="text-white/50 hover:text-white px-2">✕</button>
+            </div>
+
+            <div class="flex gap-2 relative mt-1">
                 <input type="text" id="msg-input" class="w-full bg-white/10 border border-white/20 rounded-full pl-5 pr-12 py-3 text-white placeholder-white/60 focus:outline-none focus:bg-white/25 focus:border-purple-300 transition-all text-sm font-medium shadow-sm" placeholder="Kirim pesan..." autocomplete="off">
                 <button id="send-btn" class="absolute right-1 top-1 bottom-1 bg-gradient-to-br from-purple-500 to-pink-500 hover:from-purple-400 hover:to-pink-400 text-white w-10 h-10 rounded-full flex items-center justify-center transition-all shadow-lg group active:scale-90">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4 group-hover:rotate-45 transition-transform"><path d="M3.478 2.404a.75.75 0 0 0-.926.941l2.432 7.905H13.5a.75.75 0 0 1 0 1.5H4.984l-2.432 7.905a.75.75 0 0 0 .926.94 60.519 60.519 0 0 0 18.445-8.986.75.75 0 0 0 0-1.218A60.517 60.517 0 0 0 3.478 2.404Z" /></svg>
                 </button>
+            </div>
+            
+            <div id="reaction-modal" class="hidden absolute bottom-16 left-0 right-0 z-50 flex justify-center">
+                <div class="bg-white rounded-full p-2 shadow-2xl flex gap-2 animate__animated animate__bounceIn reaction-picker">
+                    <button onclick="pilihReaction('👍')" class="hover:scale-125 transition text-2xl">👍</button>
+                    <button onclick="pilihReaction('❤️')" class="hover:scale-125 transition text-2xl">❤️</button>
+                    <button onclick="pilihReaction('😂')" class="hover:scale-125 transition text-2xl">😂</button>
+                    <button onclick="pilihReaction('😮')" class="hover:scale-125 transition text-2xl">😮</button>
+                    <button onclick="pilihReaction('😢')" class="hover:scale-125 transition text-2xl">😢</button>
+                    <button onclick="pilihReaction('🙏')" class="hover:scale-125 transition text-2xl">🙏</button>
+                    <button onclick="pilihReaction('🤞')" class="hover:scale-125 transition text-2xl">🤞</button>
+                    <button onclick="pilihReaction('👧')" class="hover:scale-125 transition text-2xl">👧</button>
+                    <button onclick="pilihReaction('🧒')" class="hover:scale-125 transition text-2xl">🧒</button>
+                    <button onclick="closeReaction()" class="text-gray-400 text-sm ml-2 px-2">✕</button>
+                </div>
             </div>
         </div>
     </div>
@@ -111,12 +148,9 @@
     </script>
 
     <script type="module">
-        // 1. IMPORT AUTH JUGA (PENTING!)
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-        import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-
-        console.log("🚀 1. SCRIPT MULAIII!!");
+        import { getFirestore, collection, addDoc, doc, updateDoc, onSnapshot, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyA9Ofp0v-rc0Z8iK98APBXrA3mSA9K_5X0",
@@ -127,7 +161,6 @@
             appId: "1:615657253892:web:768e3a8690fa0547a69951"
         };
 
-        // 2. Init App & Auth
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
@@ -135,51 +168,48 @@
         const chatBox = document.getElementById('chat-box');
         const msgInput = document.getElementById('msg-input');
         const sendBtn = document.getElementById('send-btn');
-
-        // 3. LOGIN ANONYMOUS DULU
-        console.log("🔐 Sedang mencoba login anonymous...");
+        const replyBanner = document.getElementById('reply-banner');
+        const replyToNameEl = document.getElementById('reply-to-name');
+        const replyTextEl = document.getElementById('reply-text');
         
-        signInAnonymously(auth)
-            .then(() => {
-                console.log("✅ Berhasil Login Anonymous!");
-            })
-            .catch((error) => {
-                console.error("❌ Gagal Login:", error);
-                chatBox.innerHTML = `<div class="text-red-300 text-xs py-10">Gagal Login: ${error.message}</div>`;
-            });
+        let myUid = null;
+        let replyData = null; // Menyimpan data pesan yang lagi direply
+        let activeMsgIdForReaction = null; // Menyimpan ID pesan yg lagi mau dikasih reaction
 
-        // 4. PANTENGIN STATUS LOGIN
+        signInAnonymously(auth).catch((error) => console.error("Login Gagal:", error));
+
         onAuthStateChanged(auth, (user) => {
             if (user) {
-                // KALAU SUDAH LOGIN, BARU BISA BACA CHAT
-                console.log("👤 User ID:", user.uid);
+                myUid = user.uid;
                 setupRealtimeListener();
-            } else {
-                console.log("User belum login");
             }
         });
 
-        // --- Fungsi Kirim Pesan ---
+        // 1. KIRIM PESAN (SUPPORT REPLY)
         async function kirimPesan() {
             const text = msgInput.value;
-            
             if (text.trim() === "") return;
 
             const btnText = sendBtn.innerHTML;
             sendBtn.innerHTML = "⏳";
             sendBtn.disabled = true;
 
+            const newMessage = {
+                text: text,
+                uid: myUid,
+                createdAt: serverTimestamp()
+            };
+
+            // Kalau lagi reply, tambahkan data reply
+            if (replyData) {
+                newMessage.replyTo = replyData;
+            }
+
             try {
-                await addDoc(collection(db, "messages"), {
-                    text: text,
-                    sender: "Aku",
-                    uid: auth.currentUser ? auth.currentUser.uid : "anon", // Simpan ID pengirim
-                    createdAt: serverTimestamp()
-                });
-                console.log("✅ Terkirim!");
+                await addDoc(collection(db, "messages"), newMessage);
                 msgInput.value = "";
+                cancelReply(); // Reset mode reply
             } catch (e) {
-                console.error("❌ ERROR KIRIM:", e);
                 alert("Gagal kirim: " + e.message);
             } finally {
                 sendBtn.innerHTML = btnText;
@@ -190,38 +220,141 @@
         sendBtn.addEventListener('click', kirimPesan);
         msgInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') kirimPesan(); });
 
-        // --- Fungsi Dengar Chat (Dipanggil setelah login) ---
+        // 2. LOGIC REPLY
+        window.startReply = (text, senderName) => {
+            replyData = { text: text, sender: senderName };
+            replyToNameEl.innerText = senderName;
+            replyTextEl.innerText = text;
+            replyBanner.classList.remove('hidden');
+            msgInput.focus();
+        };
+
+        window.cancelReply = () => {
+            replyData = null;
+            replyBanner.classList.add('hidden');
+        };
+
+        // 3. LOGIC REACTION
+        window.openReaction = (msgId) => {
+            activeMsgIdForReaction = msgId;
+            document.getElementById('reaction-modal').classList.remove('hidden');
+        };
+
+        window.closeReaction = () => {
+            activeMsgIdForReaction = null;
+            document.getElementById('reaction-modal').classList.add('hidden');
+        };
+
+        window.pilihReaction = async (emoji) => {
+            if (!activeMsgIdForReaction) return;
+            
+            const docRef = doc(db, "messages", activeMsgIdForReaction);
+            try {
+                // Simpan reaction sebagai Map: { "UserID": "Emoji" }
+                // Biar satu user cuma bisa kasih 1 react per pesan
+                const updateData = {};
+                updateData[`reactions.${myUid}`] = emoji;
+                
+                await updateDoc(docRef, updateData);
+                closeReaction();
+            } catch (e) {
+                console.error("Gagal kasih reaction:", e);
+            }
+        };
+
+        // 4. RENDER CHAT
         function setupRealtimeListener() {
             const q = query(collection(db, "messages"), orderBy("createdAt", "asc"));
             
             onSnapshot(q, (snapshot) => {
-                console.log("📥 Data masuk! Jumlah:", snapshot.size);
                 chatBox.innerHTML = "";
                 
                 if (snapshot.empty) {
-                    chatBox.innerHTML = '<div class="text-center text-white/50 text-xs py-10 italic">Belum ada pesan...<br>Klik tombol kamera 📸 di pojok kanan!</div>';
+                    chatBox.innerHTML = '<div class="text-center text-white/50 text-xs py-10 italic">Belum ada pesan...<br>Ayo mulai duluan!</div>';
                     return;
                 }
 
-                snapshot.forEach((doc) => {
-                    const data = doc.data();
-                    const div = document.createElement('div');
-                    
-                    // Cek apakah pesan dari diri sendiri atau orang lain (opsional)
-                    // Disini kita buat rata kanan semua dulu
-                    div.className = "flex justify-end animate__animated animate__fadeInUp animate__faster";
-                    
-                    div.innerHTML = `
-                        <div class="bg-white/20 backdrop-blur-md text-white px-4 py-2 rounded-2xl rounded-tr-none border border-white/20 shadow-sm max-w-[80%] text-left">
-                            <p class="text-sm font-medium leading-relaxed">${data.text ? data.text.replace(/</g, "&lt;") : ''}</p>
+                snapshot.forEach((docSnap) => {
+                    const data = docSnap.data();
+                    const msgId = docSnap.id;
+                    const isMe = data.uid === myUid; 
+                    const senderName = isMe ? "Aku" : "Sayang ❤️";
+
+                    // Hitung Reactions
+                    let reactionsHtml = "";
+                    if (data.reactions) {
+                        const emojis = Object.values(data.reactions);
+                        // Ambil unique emojis biar ga penuh kalau sama semua
+                        const uniqueEmojis = [...new Set(emojis)]; 
+                        if (uniqueEmojis.length > 0) {
+                            reactionsHtml = `
+                                <div class="absolute -bottom-3 ${isMe ? 'right-2' : 'left-2'} bg-white rounded-full px-2 py-0.5 text-xs shadow-md border border-gray-200">
+                                    ${uniqueEmojis.join('')} <span class="text-[9px] text-gray-500">${emojis.length}</span>
+                                </div>
+                            `;
+                        }
+                    }
+
+                    // Tampilan Reply Quote
+                    let replyHtml = "";
+                    if (data.replyTo) {
+                        replyHtml = `
+                            <div class="bg-black/10 rounded-lg p-2 mb-1 border-l-2 border-white/50 text-xs">
+                                <div class="font-bold opacity-80 mb-0.5">${data.replyTo.sender}</div>
+                                <div class="opacity-60 line-clamp-1">${escapeHtml(data.replyTo.text)}</div>
+                            </div>
+                        `;
+                    }
+
+                    // Tombol Action (Reply & React)
+                    // Kita taruh di samping bubble, muncul pas hover
+                    const actionBtns = `
+                        <div class="msg-actions flex gap-1 items-center px-2 text-white/50">
+                            <button onclick="startReply('${escapeHtml(data.text)}', '${senderName}')" class="hover:text-white hover:scale-110 transition" title="Balas">↩️</button>
+                            <button onclick="openReaction('${msgId}')" class="hover:text-white hover:scale-110 transition" title="React">😀</button>
                         </div>
                     `;
+
+                    const div = document.createElement('div');
+                    
+                    if (isMe) {
+                        // KANAN (AKU)
+                        div.className = "flex flex-col items-end animate__animated animate__fadeInUp animate__faster chat-row group";
+                        div.innerHTML = `
+                            <span class="text-[10px] text-white/70 mr-2 mb-1">Aku</span>
+                            <div class="flex flex-row-reverse items-end">
+                                <div class="relative bg-purple-500/60 backdrop-blur-md text-white px-4 py-2 rounded-2xl rounded-tr-none border border-white/30 shadow-md max-w-[80%] text-left min-w-[100px]">
+                                    ${replyHtml}
+                                    <p class="text-sm font-medium leading-relaxed">${escapeHtml(data.text)}</p>
+                                    ${reactionsHtml}
+                                </div>
+                                ${actionBtns}
+                            </div>
+                        `;
+                    } else {
+                        // KIRI (DIA)
+                        div.className = "flex flex-col items-start animate__animated animate__fadeInUp animate__faster chat-row group";
+                        div.innerHTML = `
+                            <span class="text-[10px] text-white/70 ml-2 mb-1">Sayang ❤️</span>
+                            <div class="flex items-end">
+                                <div class="relative bg-white/20 backdrop-blur-md text-white px-4 py-2 rounded-2xl rounded-tl-none border border-white/20 shadow-sm max-w-[80%] text-left min-w-[100px]">
+                                    ${replyHtml}
+                                    <p class="text-sm font-medium leading-relaxed">${escapeHtml(data.text)}</p>
+                                    ${reactionsHtml}
+                                </div>
+                                ${actionBtns}
+                            </div>
+                        `;
+                    }
+                    
                     chatBox.appendChild(div);
                 });
                 chatBox.scrollTop = chatBox.scrollHeight;
-            }, (error) => {
-                console.error("❌ ERROR BACA DATA:", error);
             });
+        }
+
+        function escapeHtml(text) {
+            return text ? text.replace(/</g, "&lt;") : '';
         }
     </script>
 </body>
